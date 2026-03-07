@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "MailTrack",
+  "version": "0.1.0",
+  "description": "Real-time email open tracking for Gmail",
+  "permissions": ["storage"],
+  "host_permissions": ["https://mail.google.com/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://mail.google.com/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}
