@@ -15,8 +15,14 @@ const SEND_BTN_SELECTOR = '[data-tooltip^="Send"], [aria-label^="Send "]';
 // Identified by finding the Bold button and walking up to its toolbar row.
 const BOLD_BTN_SELECTOR = '[data-tooltip="Bold"]';
 
-// The compose body (editable area)
-const BODY_SELECTOR = 'div[contenteditable="true"][aria-label*="Message Body"], div[contenteditable="true"][aria-multiline="true"]';
+// The compose body (editable area).
+// Gmail doesn't expose a stable selector here — we try several in order.
+const BODY_SELECTORS = [
+  'div[contenteditable="true"][aria-label*="Message Body"]',
+  'div[contenteditable="true"][g_editable="true"]',
+  'div[contenteditable="true"].Am',
+  'div[contenteditable="true"]',
+];
 
 // Subject and recipient fields
 const SUBJECT_SELECTOR = 'input[name="subjectbox"]';
@@ -46,20 +52,46 @@ function getRecipient(composeEl) {
   return composeEl.querySelector(TO_INPUT_SELECTOR)?.value?.trim() || '';
 }
 
+function findComposeBody(composeEl) {
+  // Walk up the DOM level by level, checking each ancestor's subtree.
+  // The compose window root will contain both the send button and the body,
+  // so we'll find the contenteditable once we reach that level.
+  let ancestor = composeEl;
+
+  while (ancestor && ancestor !== document.body) {
+    for (const sel of BODY_SELECTORS) {
+      const el = ancestor.querySelector(sel);
+      if (el) return el;
+    }
+    ancestor = ancestor.parentElement;
+  }
+
+  console.warn('[MailTrack] Could not find compose body');
+  return null;
+}
+
 function injectPixel(composeEl, id, serverUrl) {
-  const body = composeEl.querySelector(BODY_SELECTOR);
+  const body = findComposeBody(composeEl);
   if (!body) {
-    console.warn('[MailTrack] Could not find compose body — pixel not injected');
+    console.warn('[MailTrack] Pixel not injected — no compose body found');
     return;
   }
 
-  const img = document.createElement('img');
-  img.src = `${serverUrl}/track/${id}`;
-  img.width = 1;
-  img.height = 1;
-  img.style.cssText = 'width:1px!important;height:1px!important;border:0!important;display:block!important;';
-  img.alt = '';
-  body.appendChild(img);
+  // Move cursor to end of body so the pixel is appended there
+  body.focus();
+  const sel = window.getSelection();
+  const range = document.createRange();
+  range.selectNodeContents(body);
+  range.collapse(false);
+  sel.removeAllRanges();
+  sel.addRange(range);
+
+  // execCommand fires the proper input/mutation events that Gmail's internal
+  // content model listens to — plain appendChild does not.
+  const imgHtml = `<img src="${serverUrl}/track/${id}" data-mailtrack="true" width="1" height="1" style="width:1px!important;height:1px!important;border:0!important;display:block!important;" alt="">`;
+  document.execCommand('insertHTML', false, imgHtml);
+
+  console.log(`[MailTrack] Pixel injected — tracking id: ${id}`);
 }
 
 async function registerMail(id, subject, recipient) {
@@ -70,17 +102,10 @@ async function registerMail(id, subject, recipient) {
   mails.unshift({ id, subject, recipient, sent_at: sentAt, opened_at: null });
   await chrome.storage.local.set({ mails });
 
-  // Best-effort server registration
-  try {
-    const serverUrl = await getServerUrl();
-    await fetch(`${serverUrl}/mails`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, subject, recipient }),
-    });
-  } catch (err) {
-    console.warn('[MailTrack] Server unreachable — mail saved locally only:', err.message);
-  }
+  // Delegate the server fetch to the background service worker.
+  // Content scripts are blocked from fetching localhost directly by Chrome's
+  // Private Network Access policy. The background worker is not.
+  chrome.runtime.sendMessage({ type: 'REGISTER_MAIL', payload: { id, subject, recipient } });
 }
 
 // -----------------------------------------------------------------------
@@ -119,13 +144,25 @@ function setupCompose(sendBtn) {
     </svg>
   `;
 
-  trackBtn.addEventListener('click', () => {
+  trackBtn.addEventListener('click', async () => {
     isTracking = !isTracking;
-    trackingId = isTracking ? generateId() : null;
     trackBtn.setAttribute('data-tracking', isTracking ? 'on' : 'off');
     trackBtn.title = isTracking
       ? 'MailTrack: tracking ON — click to disable'
       : 'MailTrack: click to track this email';
+
+    if (isTracking) {
+      // Inject the pixel now, while the compose window is open and idle.
+      // This ensures it's already in the body when Gmail serializes on Send.
+      trackingId = generateId();
+      const serverUrl = await getServerUrl();
+      injectPixel(composeEl, trackingId, serverUrl);
+    } else {
+      // Remove the pixel if the user toggles tracking off
+      const body = findComposeBody(composeEl);
+      body?.querySelector('img[data-mailtrack]')?.remove();
+      trackingId = null;
+    }
   });
 
   // Insert after the Bold button's toolbar row, falling back to beside the send button
@@ -138,16 +175,11 @@ function setupCompose(sendBtn) {
   }
 
   // --- Wire up the send button ---
-  // capture:true runs our handler BEFORE Gmail's, so the pixel is in the
-  // DOM when Gmail serializes the email body.
-  sendBtn.addEventListener('click', async () => {
+  // Pixel is already in the body from toggle time. Just register the mail.
+  sendBtn.addEventListener('click', () => {
     if (!isTracking || !trackingId) return;
-
     const subject = getSubject(composeEl);
     const recipient = getRecipient(composeEl);
-    const serverUrl = await getServerUrl();
-
-    injectPixel(composeEl, trackingId, serverUrl);
     registerMail(trackingId, subject, recipient);
   }, { capture: true });
 }

@@ -8,6 +8,22 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Chrome's Private Network Access policy requires this header when a public
+// page (e.g. mail.google.com over HTTPS) fetches a loopback address.
+app.use((req, res, next) => {
+  res.set('Access-Control-Allow-Private-Network', 'true');
+  next();
+});
+
+// Handle the PNA preflight (OPTIONS) requests explicitly
+app.options('*', (req, res) => {
+  res.set('Access-Control-Allow-Private-Network', 'true');
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.sendStatus(204);
+});
+
 // 1x1 transparent PNG (hardcoded to avoid a file read on every request)
 const PIXEL = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
