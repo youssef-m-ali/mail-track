@@ -36,9 +36,17 @@ function generateId() {
   return crypto.randomUUID();
 }
 
+function isContextValid() {
+  try { return !!chrome.runtime?.id; } catch { return false; }
+}
+
 async function getServerUrl() {
-  const { serverUrl } = await chrome.storage.sync.get({ serverUrl: 'http://localhost:3000' });
-  return serverUrl;
+  try {
+    const { serverUrl } = await chrome.storage.sync.get({ serverUrl: 'https://localhost:3000' });
+    return serverUrl;
+  } catch {
+    return 'https://localhost:3000';
+  }
 }
 
 function getSubject(composeEl) {
@@ -95,17 +103,22 @@ function injectPixel(composeEl, id, serverUrl) {
 }
 
 async function registerMail(id, subject, recipient) {
+  if (!isContextValid()) return;
   const sentAt = new Date().toISOString();
 
-  // Always write to local storage first (works even if server is unreachable)
-  const { mails = [] } = await chrome.storage.local.get('mails');
-  mails.unshift({ id, subject, recipient, sent_at: sentAt, opened_at: null });
-  await chrome.storage.local.set({ mails });
+  try {
+    // Always write to local storage first (works even if server is unreachable)
+    const { mails = [] } = await chrome.storage.local.get('mails');
+    mails.unshift({ id, subject, recipient, sent_at: sentAt, opened_at: null });
+    await chrome.storage.local.set({ mails });
 
-  // Delegate the server fetch to the background service worker.
-  // Content scripts are blocked from fetching localhost directly by Chrome's
-  // Private Network Access policy. The background worker is not.
-  chrome.runtime.sendMessage({ type: 'REGISTER_MAIL', payload: { id, subject, recipient } });
+    // Delegate the server fetch to the background service worker.
+    // Content scripts are blocked from fetching localhost directly by Chrome's
+    // Private Network Access policy. The background worker is not.
+    chrome.runtime.sendMessage({ type: 'REGISTER_MAIL', payload: { id, subject, recipient } });
+  } catch (err) {
+    console.warn('[MailTrack] Context invalidated during registerMail:', err.message);
+  }
 }
 
 // -----------------------------------------------------------------------
