@@ -69,10 +69,10 @@ The system has two components:
 - When enabled, a unique tracking ID is generated and a pixel URL is injected into the email body (hidden, 1x1px)
 - A subtle indicator shows the email is being tracked before sending
 
-### 6.2 Real-Time Open Notification
-- When the pixel is loaded by the recipient's mail client, the server fires a notification
-- The Chrome extension receives it and displays a **browser notification**: *"Your email '[subject]' was just opened"*
-- Only fires on **first open** in v1
+### 6.2 Open Detection
+- When the pixel is loaded by the recipient's mail client, the server records the first open event (timestamp)
+- Only the **first open** is recorded in v1
+- The extension popup is the primary way to check open status — no push/browser notifications in v1
 
 ### 6.3 Extension Popup
 - Lists all tracked sent emails
@@ -89,7 +89,6 @@ The system has two components:
 ### 6.5 Settings Page
 - Server URL (where the user's tracking server is hosted)
 - Toggle: track all emails by default vs. opt-in per email
-- Toggle: enable/disable browser notifications
 
 ---
 
@@ -158,7 +157,7 @@ These should be documented clearly in the README — being honest about limitati
 |---|---|
 | **M1 - Server** | Tracking server with `/track/:id` endpoint, SQLite storage, WebSocket/SSE push |
 | **M2 - Extension Core** | MV3 extension skeleton, Gmail compose injection, pixel append on send |
-| **M3 - Notifications** | Real-time browser notification on open event |
+| **M3 - Open Detection** | SSE push from server to extension on pixel load; first open recorded in DB |
 | **M4 - Popup UI** | Tracked emails list with sent/opened status and timestamps |
 | **M5 - Settings** | Server URL config, default tracking toggle |
 | **M6 - Polish & Docs** | README, self-hosting guide, limitations documented, demo GIF |
