@@ -2,7 +2,6 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { insertMail, getMails, getMailById, markOpened } = require('./db');
-const { addClient, broadcast } = require('./sse');
 
 const app = express();
 app.use(cors());
@@ -44,13 +43,12 @@ app.get('/track/:id', (req, res) => {
     const openedAt = new Date().toISOString();
     const wasFirstOpen = markOpened(id, openedAt);
     if (wasFirstOpen) {
-      broadcast('opened', {
-        id,
-        subject: mail.subject,
-        recipient: mail.recipient,
-        opened_at: openedAt,
-      });
+      console.log(`[open] "${mail.subject}" — ${mail.recipient} — ${openedAt}`);
+    } else {
+      console.log(`[open] "${mail.subject}" — repeat open, skipped (first: ${mail.opened_at})`);
     }
+  } else {
+    console.warn(`[open] unknown id: ${id}`);
   }
 
   res.set({
@@ -60,22 +58,6 @@ app.get('/track/:id', (req, res) => {
     'Expires': '0',
   });
   res.send(PIXEL);
-});
-
-// -------------------------------------------------------------------
-// GET /events
-// SSE stream — the Chrome extension connects here to receive real-time
-// open notifications.
-// -------------------------------------------------------------------
-app.get('/events', (req, res) => {
-  res.set({
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
-  });
-  res.flushHeaders();
-  res.write('event: connected\ndata: {}\n\n');
-  addClient(res);
 });
 
 // -------------------------------------------------------------------
@@ -99,7 +81,16 @@ app.get('/mails', (req, res) => {
   res.json(getMails());
 });
 
+const fs = require('fs');
+const https = require('https');
+
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`MailTrack server running on http://localhost:${PORT}`);
-});
+const certPath = process.env.SSL_CERT;
+const keyPath = process.env.SSL_KEY;
+
+if (certPath && keyPath) {
+  https.createServer({ cert: fs.readFileSync(certPath), key: fs.readFileSync(keyPath) }, app)
+    .listen(PORT, () => console.log(`MailTrack server running on https://localhost:${PORT}`));
+} else {
+  app.listen(PORT, () => console.log(`MailTrack server running on http://localhost:${PORT}`));
+}
