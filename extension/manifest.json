@@ -7,6 +7,10 @@
   "icons": {
     "48": "icons/icon48.png"
   },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icons/icon48.png"
+  },
   "host_permissions": [
     "https://mail.google.com/*",
     "http://localhost/*",
