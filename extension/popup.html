@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MailTrack</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header>
+    <span class="logo">✉ MailTrack</span>
+  </header>
+
+  <main id="content">
+    <div id="loading" class="state">Loading…</div>
+    <div id="error" class="state hidden"></div>
+    <div id="empty" class="state hidden">No tracked emails yet.<br>Toggle tracking in a Gmail compose window to get started.</div>
+    <ul id="mail-list" class="hidden"></ul>
+  </main>
+
+  <script src="popup.js"></script>
+</body>
+</html>
