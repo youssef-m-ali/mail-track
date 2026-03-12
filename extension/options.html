@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MailTrack Settings</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <header>
+    <span class="logo">✉ MailTrack — Settings</span>
+  </header>
+
+  <main>
+    <form id="settings-form">
+      <div class="field">
+        <label for="server-url">Server URL</label>
+        <p class="hint">The base URL of your self-hosted MailTrack server (no trailing slash).</p>
+        <input type="url" id="server-url" placeholder="https://localhost:3000" />
+      </div>
+
+      <div class="field">
+        <label class="checkbox-label">
+          <input type="checkbox" id="track-default" />
+          Track emails by default
+        </label>
+        <p class="hint">When enabled, the tracking pixel is turned on automatically for every new compose window.</p>
+      </div>
+
+      <div class="actions">
+        <button type="submit">Save</button>
+        <span id="saved-msg" class="saved-msg hidden">Saved!</span>
+      </div>
+    </form>
+  </main>
+
+  <script src="options.js"></script>
+</body>
+</html>

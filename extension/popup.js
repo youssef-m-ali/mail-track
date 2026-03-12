@@ -55,4 +55,8 @@ async function load() {
   }
 }
 
+document.getElementById('settings-btn').addEventListener('click', () => {
+  chrome.runtime.openOptionsPage();
+});
+
 load();

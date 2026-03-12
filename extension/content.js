@@ -40,12 +40,11 @@ function isContextValid() {
   try { return !!chrome.runtime?.id; } catch { return false; }
 }
 
-async function getServerUrl() {
+async function getSettings() {
   try {
-    const { serverUrl } = await chrome.storage.sync.get({ serverUrl: 'https://localhost:3000' });
-    return serverUrl;
+    return await chrome.storage.sync.get({ serverUrl: 'https://localhost:3000', trackDefault: false });
   } catch {
-    return 'https://localhost:3000';
+    return { serverUrl: 'https://localhost:3000', trackDefault: false };
   }
 }
 
@@ -127,7 +126,7 @@ async function registerMail(id, subject, recipient) {
 // Track which send buttons we've already wired up
 const wiredSendButtons = new WeakSet();
 
-function setupCompose(sendBtn) {
+async function setupCompose(sendBtn) {
   if (wiredSendButtons.has(sendBtn)) return;
   wiredSendButtons.add(sendBtn);
 
@@ -137,6 +136,7 @@ function setupCompose(sendBtn) {
   if (!composeEl) return;
 
   // --- Build the track toggle button ---
+  const { serverUrl, trackDefault } = await getSettings();
   let isTracking = false;
   let trackingId = null;
 
@@ -168,7 +168,6 @@ function setupCompose(sendBtn) {
       // Inject the pixel now, while the compose window is open and idle.
       // This ensures it's already in the body when Gmail serializes on Send.
       trackingId = generateId();
-      const serverUrl = await getServerUrl();
       injectPixel(composeEl, trackingId, serverUrl);
     } else {
       // Remove the pixel if the user toggles tracking off
@@ -185,6 +184,15 @@ function setupCompose(sendBtn) {
     toolbar.appendChild(trackBtn);
   } else {
     sendBtn.insertAdjacentElement('afterend', trackBtn);
+  }
+
+  // Auto-enable tracking if the user has set track-by-default
+  if (trackDefault) {
+    isTracking = true;
+    trackingId = generateId();
+    trackBtn.setAttribute('data-tracking', 'on');
+    trackBtn.title = 'MailTrack: tracking ON — click to disable';
+    injectPixel(composeEl, trackingId, serverUrl);
   }
 
   // --- Wire up the send button ---

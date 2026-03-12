@@ -1,6 +1,6 @@
 // Set default server URL on first install
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.storage.sync.set({ serverUrl: 'https://localhost:3000' });
+  chrome.storage.sync.set({ serverUrl: 'https://localhost:3000', trackDefault: false });
 });
 
 // Proxy server fetches from the content script.
